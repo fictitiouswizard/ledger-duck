@@ -1,7 +1,10 @@
 from sqlmodel import create_engine, Session, SQLModel
+import os
 
-
-postgres_url = "postgresql://localhost/duckledger"
+try:
+    postgres_url = os.environ["postgres_url"]
+except KeyError:
+    postgres_url = "postgresql://localhost/duckledger"
 engine = create_engine(postgres_url)
 
 

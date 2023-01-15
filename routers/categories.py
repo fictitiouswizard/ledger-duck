@@ -1,7 +1,7 @@
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select
 from database import create_session
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 
 from schemas import Category, CreateCategory, ReadCategory, User
 from routers.auth import get_current_active_user
@@ -14,8 +14,13 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 def get_categories(
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
+        offset: int = 0,
+        limit: int = Query(default=100, lte=100)
 ):
-    categories = session.exec(select(Category)).all()
+    cmd = select(Category).where(Category.user_id == user.id)
+    cmd.offset(offset)
+    cmd.limit(limit)
+    categories = session.exec(select(cmd)).all()
     return categories
 
 
@@ -37,7 +42,8 @@ def get_category(
         user: User = Depends(get_current_active_user),
         category_id: int
 ):
-    category = session.get(Category, category_id)
+    cmd = select(Category).where(Category.user_id == user.id).where(Category.id == category_id)
+    category = session.exec(cmd).first()
     if category:
         return category
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
