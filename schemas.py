@@ -79,3 +79,15 @@ class CreateTransaction(BaseTransaction):
 
 class CreateAccountTransaction(BaseTransaction):
     category_id: int
+
+
+class BaseUser(SQLModel):
+    email: str = Field(unique=True)
+    username: str = Field(unique=True)
+    locked: bool = False
+    active: bool = True
+
+
+class User(BaseUser, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    hashed_password: str
