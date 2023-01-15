@@ -31,12 +31,10 @@ def get_transactions_for_account(
         limit: int = 0,
         offset: int = Query(default=100, lte=100)
 ):
-    account = session.get(Account, account_id)
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    cmd = select(Transaction).where(Transaction.account_id == account.id)
-    cmd.offset(offset)
-    cmd.limit(limit)
+    cmd = select(Transaction).where(Transaction.user_id == user.id)
+    cmd = cmd.where(Transaction.account_id == account_id)
+    cmd = cmd.offset(offset)
+    cmd = cmd.limit(limit)
     transactions = session.exec(cmd).all()
     return transactions
 
@@ -55,7 +53,10 @@ def create_transaction_for_account(
     account = session.get(Account, account_id)
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    transaction_db = Transaction.from_orm(CreateTransaction(**transaction.dict(), account_id=account.id))
+    transaction_db = Transaction.from_orm(
+        CreateTransaction(**transaction.dict(), account_id=account.id),
+        update={"user_id": user.id},
+    )
     session.add(transaction_db)
     session.commit()
     session.refresh(transaction_db)
@@ -70,7 +71,11 @@ def get_transactions(
         offset: int = 0,
         limit: int = Query(default=100, lte=100),
 ):
-    transactions = session.exec(select(Transaction).offset(offset).limit(limit)).all()
+    cmd = select(Transaction)
+    cmd = cmd.where(Transaction.user_id == user.id)
+    cmd = cmd.offset(offset)
+    cmd = cmd.limit(limit)
+    transactions = session.exec(cmd).all()
     return transactions
 
 
@@ -81,9 +86,10 @@ def create_transaction(
         user: User = Depends(get_current_active_user),
         transaction: CreateTransaction,
 ):
-    session.add(transaction)
+    transaction_db = Transaction.from_orm(transaction, update={"user_id": user.id})
+    session.add(transaction_db)
     session.commit()
-    session.refresh(transaction)
+    session.refresh(transaction_db)
     return transaction
 
 
@@ -94,7 +100,9 @@ def get_transaction(
         user: User = Depends(get_current_active_user),
         transaction_id: int
 ):
-    transaction = session.get(Transaction, transaction_id)
+    cmd = select(Transaction).where(Transaction.id == transaction_id)
+    cmd = cmd.where(Transaction.user_id == user.id)
+    transaction = session.exec(cmd).first()
     if transaction:
         return transaction
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")

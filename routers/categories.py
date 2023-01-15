@@ -56,7 +56,8 @@ def create_category(
         user: User = Depends(get_current_active_user),
         category: CreateCategory
 ):
-    session.add(category)
+    category_db = Category.from_orm(category, update={"user_id": user.id})
+    session.add(category_db)
     session.commit()
-    session.refresh(category)
-    return category
+    session.refresh(category_db)
+    return category_db
