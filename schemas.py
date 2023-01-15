@@ -21,7 +21,9 @@ class BaseAccount(SQLModel):
 class Account(BaseAccount, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
+    user_id: int = Field(foreign_key="user.id")
     transactions: list["Transaction"] = Relationship(back_populates="account")
+    user: "User" = Relationship(back_populates="accounts")
 
 
 class CreateAccount(BaseAccount):
@@ -39,7 +41,9 @@ class BaseCategory(SQLModel):
 class Category(BaseCategory, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
+    user_id: int = Field(foreign_key="user.id")
     transactions: list["Transaction"] = Relationship(back_populates="category")
+    user: "User" = Relationship(back_populates="categories")
 
 
 class CreateCategory(BaseCategory):
@@ -62,8 +66,10 @@ class Transaction(BaseTransaction, table=True):
 
     account_id: int = Field(foreign_key="account.id")
     category_id: int = Field(foreign_key="category.id")
+    user_id: int = Field(foreign_key="user.id")
     account: Account = Relationship(back_populates="transactions")
     category: Category = Relationship(back_populates="transactions")
+    user: "User" = Relationship(back_populates="transactions")
 
 
 class ReadTransaction(BaseTransaction):
@@ -91,3 +97,7 @@ class BaseUser(SQLModel):
 class User(BaseUser, table=True):
     id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
+
+    transactions: list[Transaction] = Relationship(back_populates="user")
+    categories: list[Category] = Relationship(back_populates="user")
+    accounts: list[Account] = Relationship(back_populates="user")
