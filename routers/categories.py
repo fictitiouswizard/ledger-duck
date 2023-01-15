@@ -3,14 +3,18 @@ from sqlmodel import Session, select
 from database import create_session
 from fastapi import Depends, HTTPException, status
 
-from schemas import Category, CreateCategory, ReadCategory
+from schemas import Category, CreateCategory, ReadCategory, User
+from routers.auth import get_current_active_user
 
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 @router.get("/", response_model=list[ReadCategory])
-def get_categories(session: Session = Depends(create_session)):
+def get_categories(
+        session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
+):
     categories = session.exec(select(Category)).all()
     return categories
 
@@ -27,7 +31,12 @@ def get_categories(session: Session = Depends(create_session)):
                     }
                 }
             })
-def get_category(*, session: Session = Depends(create_session), category_id: int):
+def get_category(
+        *,
+        session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
+        category_id: int
+):
     category = session.get(Category, category_id)
     if category:
         return category
@@ -35,7 +44,12 @@ def get_category(*, session: Session = Depends(create_session), category_id: int
 
 
 @router.post("/", response_model=ReadCategory)
-def create_category(*, session: Session = Depends(create_session), category: CreateCategory):
+def create_category(
+        *,
+        session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
+        category: CreateCategory
+):
     session.add(category)
     session.commit()
     session.refresh(category)

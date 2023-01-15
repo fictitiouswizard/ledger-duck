@@ -3,7 +3,8 @@ from sqlmodel import Session, select
 from fastapi import Depends, HTTPException, status, Query
 
 from database import create_session
-from schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account
+from schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User
+from routers.auth import get_current_active_user
 
 accounts_router = APIRouter(
     prefix="/accounts/{account_id}/transactions",
@@ -25,6 +26,7 @@ router = APIRouter()
 def get_transactions_for_account(
         *,
         session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
         account_id: int,
         limit: int = 0,
         offset: int = Query(default=100, lte=100)
@@ -46,6 +48,7 @@ def get_transactions_for_account(
 def create_transaction_for_account(
         *,
         session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
         account_id: int,
         transaction: CreateAccountTransaction
 ):
@@ -63,6 +66,7 @@ def create_transaction_for_account(
 def get_transactions(
         *,
         session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
         offset: int = 0,
         limit: int = Query(default=100, lte=100),
 ):
@@ -74,6 +78,7 @@ def get_transactions(
 def create_transaction(
         *,
         session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
         transaction: CreateTransaction,
 ):
     session.add(transaction)
@@ -83,7 +88,12 @@ def create_transaction(
 
 
 @transactions_router.get("/{transaction_id}", response_model=ReadTransaction)
-def get_transaction(*, session: Session = Depends(create_session), transaction_id: int):
+def get_transaction(
+        *,
+        session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
+        transaction_id: int
+):
     transaction = session.get(Transaction, transaction_id)
     if transaction:
         return transaction
