@@ -1,7 +1,7 @@
 import datetime
 import enum
-
 from sqlmodel import SQLModel, Field, Relationship
+import uuid
 
 
 class TransactionType(str, enum.Enum):
@@ -19,7 +19,12 @@ class BaseAccount(SQLModel):
 
 
 class Account(BaseAccount, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
     active: bool = Field(default=True)
 
     user_id: int = Field(foreign_key="user.id")
@@ -45,7 +50,12 @@ class BaseCategory(SQLModel):
 
 
 class Category(BaseCategory, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
     active: bool = Field(default=True)
 
     user_id: int = Field(foreign_key="user.id")
@@ -76,7 +86,12 @@ class BaseTransaction(SQLModel):
 
 
 class Transaction(BaseTransaction, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
     active: bool = Field(default=True)
 
     account_id: int = Field(foreign_key="account.id")
@@ -119,7 +134,12 @@ class BaseUser(SQLModel):
 
 
 class User(BaseUser, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
     hashed_password: str
     reset_token: str | None = Field(default=None)
 
@@ -139,7 +159,12 @@ class BaseBill(SQLModel):
 
 
 class Bill(BaseBill, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
     active: bool = Field(default=True)
 
     user_id: int = Field(foreign_key="user.id")
@@ -170,3 +195,16 @@ class ReadTransaction(BaseTransaction):
     account: Account
     category: Category
     bill: Bill | None
+
+
+class RefreshToken(SQLModel, table=True):
+    id: uuid.UUID = Field(
+        primary_key=True,
+        default_factory=uuid.uuid4,
+        index=True,
+        nullable=False
+    )
+    token: str
+    user_id: int
+    active: bool = Field(default=True)
+    valid_until: datetime.datetime

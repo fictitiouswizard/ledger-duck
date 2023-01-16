@@ -8,14 +8,24 @@ from fastapi.routing import APIRouter
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from schemas import User
+from schemas import User, RefreshToken
 from sqlmodel import Session, select
 from database import create_session
 
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class AccessToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class RefreshAccessToken(BaseModel):
+    refresh_token: str
 
 
 class TokenData(BaseModel):
@@ -116,6 +126,19 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
+def create_refresh_token(user_id: int, expires_delta: timedelta | None = None) -> (str, RefreshToken):
+    token_secret = secrets.token_urlsafe(32)
+    token_data = {"sub": token_secret}
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=30)
+    token_data.update({"exp": expire})
+    encoded_jwt = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    refresh_token = RefreshToken(user_id=user_id, token=token_secret, valid_until=expire)
+    return encoded_jwt, refresh_token
+
+
 @router.post("/register", response_model=RegisterResponse)
 def register_account(*, session: Session = Depends(create_session), registration: RegisterUser):
     username_user = session.exec(select(User).where(User.username == registration.username)).all()
@@ -143,7 +166,30 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token_str,  refresh_token = create_refresh_token(user_id=user.id)
+    session.add(refresh_token)
+    session.commit()
+    return {"access_token": access_token, "refresh_token": refresh_token_str, "token_type": "bearer"}
+
+
+@router.post("/refresh", response_model=AccessToken)
+async def refresh_access_token(*, session: Session = Depends(create_session), token_data: RefreshAccessToken):
+    payload: dict = jwt.decode(token_data.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    token: str = payload.get("sub")
+    cmd = select(RefreshToken).where(RefreshToken.token == token)
+    try:
+        refresh_token = session.exec(cmd).one()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalid")
+
+    cmd = select(User).where(User.id == refresh_token.user_id)
+    user = session.exec(cmd).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalid")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    token_response = AccessToken(access_token=access_token)
+    return token_response
 
 
 @router.post("/send_reset_email")
