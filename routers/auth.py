@@ -1,11 +1,13 @@
 from datetime import timedelta, datetime
-
+import secrets
+import emailduck
 from fastapi import Depends, HTTPException, status
+from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.routing import APIRouter
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from schemas import User
 from sqlmodel import Session, select
 from database import create_session
@@ -25,8 +27,26 @@ class RegisterResponse(BaseModel):
 
 
 class RegisterUser(BaseModel):
-    username: str
+    username: str = Field(min_length=6, max_length=20)
+    email: str = Field(regex=r"^\S+@\S+\.\S+$")
+    password: str = Field(min_length=8, regex=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "username": "MyUsername",
+                "email": "tester.mctestface@test.test",
+                "password": "My5uperSecurePa55word",
+            }
+        }
+
+
+class ResetEmail(BaseModel):
     email: str
+
+
+class ResetPassword(BaseModel):
+    token: str
     password: str
 
 
@@ -124,3 +144,52 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/send_reset_email")
+def reset_password_email(
+        *,
+        session: Session = Depends(create_session),
+        reset_email: ResetEmail
+):
+    cmd = select(User).where(User.email == reset_email.email)
+    user = session.exec(cmd).first()
+    if not user:
+        return Response(status_code=status.HTTP_200_OK)
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    emailduck.send_password_reset_email(token, user.email)
+    return Response(status_code=status.HTTP_200_OK)
+
+
+@router.post("/reset_password")
+def reset_password(
+        *,
+        session: Session = Depends(create_session),
+        password_reset: ResetPassword,
+):
+    user = session.exec(select(User).where(User.reset_token == password_reset.token)).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+    user.hashed_password = get_password_hash(password_reset.password)
+    user.reset_token = None
+    session.add(user)
+    session.commit()
+    Response(status_code=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

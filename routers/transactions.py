@@ -3,7 +3,8 @@ from sqlmodel import Session, select
 from fastapi import Depends, HTTPException, status, Query
 
 from database import create_session
-from schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User
+from schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User, \
+    UpdateTransaction
 from routers.auth import get_current_active_user
 
 accounts_router = APIRouter(
@@ -106,6 +107,30 @@ def get_transaction(
     if transaction:
         return transaction
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+
+
+@transactions_router.patch("/{transaction_id}", response_model=ReadTransaction)
+def update_transaction(
+        *,
+        session: Session = Depends(create_session),
+        user: User = Depends(get_current_active_user),
+        transaction_id: int,
+        transaction_update: UpdateTransaction,
+):
+    cmd = select(Transaction).where(Transaction.user == user)
+    cmd = cmd.where(Transaction.id == transaction_id)
+    transaction = session.exec(cmd).first()
+    if not transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    update_dict = transaction_update.dict(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(transaction, key, value)
+    session.add(transaction)
+    session.commit()
+    session.refresh(transaction)
+    return transaction
+
+
 
 
 router.include_router(accounts_router)
