@@ -4,6 +4,7 @@ from fastapi import Depends, status, HTTPException, Query
 from schemas import Account, ReadAccount, CreateAccount, UpdateAccount, User
 from database import create_session
 from routers.auth import get_current_active_user
+import uuid
 
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -53,7 +54,7 @@ def get_account(
         *,
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
-        account_id: int):
+        account_id: uuid.UUID):
     account = session.exec(select(Account).where(Account.id == account_id).where(Account.user_id == user.id)).first()
     if account:
         return account
@@ -65,7 +66,7 @@ def update_account(
         *,
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
-        account_id: int,
+        account_id: uuid.UUID,
         account_update: UpdateAccount,
 ):
     cmd = select(Account).where(Account.user == user)

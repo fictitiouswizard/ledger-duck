@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select, col
 from fastapi import Depends, status, HTTPException, Query
@@ -52,7 +54,7 @@ def get_bill(
         *,
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
-        bill_id: int
+        bill_id: uuid.UUID
 ):
     cmd = select(Bill).where(Bill.user == user)
     cmd = cmd.where(Bill.id == bill_id)
@@ -67,7 +69,7 @@ def update_bill(
         *,
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
-        bill_id: int,
+        bill_id: uuid.UUID,
         bill_update: UpdateBill,
 ):
     cmd = select(Bill).where(Bill.user == user)

@@ -27,7 +27,7 @@ class Account(BaseAccount, table=True):
     )
     active: bool = Field(default=True)
 
-    user_id: int = Field(foreign_key="user.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
     transactions: list["Transaction"] = Relationship(back_populates="account")
     user: "User" = Relationship(back_populates="accounts")
 
@@ -37,7 +37,7 @@ class CreateAccount(BaseAccount):
 
 
 class ReadAccount(BaseAccount):
-    id: int
+    id: uuid.UUID
 
 
 class UpdateAccount(SQLModel):
@@ -58,7 +58,7 @@ class Category(BaseCategory, table=True):
     )
     active: bool = Field(default=True)
 
-    user_id: int = Field(foreign_key="user.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
     transactions: list["Transaction"] = Relationship(back_populates="category")
     user: "User" = Relationship(back_populates="categories")
 
@@ -68,7 +68,7 @@ class CreateCategory(BaseCategory):
 
 
 class ReadCategory(BaseCategory):
-    id: int
+    id: uuid.UUID
 
 
 class UpdateCategory(SQLModel):
@@ -79,10 +79,10 @@ class UpdateCategory(SQLModel):
 class BaseTransaction(SQLModel):
     memo: str
     amount: float
-    transaction_date: datetime.datetime
+    transaction_date: datetime.date
     transaction_type: TransactionType
     description: str | None
-    transaction_id: str | None
+    transaction_id: uuid.UUID | None
 
 
 class Transaction(BaseTransaction, table=True):
@@ -93,11 +93,12 @@ class Transaction(BaseTransaction, table=True):
         nullable=False
     )
     active: bool = Field(default=True)
+    running_balance: float
 
-    account_id: int = Field(foreign_key="account.id")
-    category_id: int = Field(foreign_key="category.id")
-    user_id: int = Field(foreign_key="user.id")
-    bill_id: int | None = Field(default=None, foreign_key="bill.id")
+    account_id: uuid.UUID = Field(foreign_key="account.id")
+    category_id: uuid.UUID = Field(foreign_key="category.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    bill_id: uuid.UUID | None = Field(default=None, foreign_key="bill.id")
     account: Account = Relationship(back_populates="transactions")
     category: Category = Relationship(back_populates="transactions")
     user: "User" = Relationship(back_populates="transactions")
@@ -111,19 +112,19 @@ class UpdateTransaction(SQLModel):
     transaction_date: datetime.datetime | None
     transaction_type: TransactionType | None
     description: str | None
-    transaction_id: str | None
-    category_id: int | None
-    bill_id: int | None
+    transaction_id: uuid.UUID | None
+    category_id: uuid.UUID | None
+    bill_id: uuid.UUID | None
 
 
 class CreateTransaction(BaseTransaction):
-    account_id: int
-    category_id: int
-    bill_id: int | None = Field(default=None)
+    account_id: uuid.UUID
+    category_id: uuid.UUID
+    bill_id: uuid.UUID | None = Field(default=None)
 
 
 class CreateAccountTransaction(BaseTransaction):
-    category_id: int
+    category_id: uuid.UUID
 
 
 class BaseUser(SQLModel):
@@ -167,7 +168,7 @@ class Bill(BaseBill, table=True):
     )
     active: bool = Field(default=True)
 
-    user_id: int = Field(foreign_key="user.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
     user: User = Relationship(back_populates="bills")
     transactions: list[Transaction] = Relationship(back_populates="bill")
 
@@ -191,7 +192,8 @@ class UpdateBill(SQLModel):
 
 
 class ReadTransaction(BaseTransaction):
-    id: int
+    id: uuid.UUID
+    running_balance: float
     account: Account
     category: Category
     bill: Bill | None
@@ -205,6 +207,6 @@ class RefreshToken(SQLModel, table=True):
         nullable=False
     )
     token: str
-    user_id: int
+    user_id: uuid.UUID
     active: bool = Field(default=True)
     valid_until: datetime.datetime

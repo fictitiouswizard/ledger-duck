@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select, col
 from database import create_session
@@ -62,7 +64,7 @@ def get_category(
         *,
         session: Session = Depends(create_session),
         user: User = Depends(get_current_active_user),
-        category_id: int
+        category_id: uuid.UUID
 ):
     cmd = select(Category).where(Category.user_id == user.id).where(Category.id == category_id)
     category = session.exec(cmd).first()
@@ -76,7 +78,7 @@ def update_category(
     *,
     session: Session = Depends(create_session),
     user: User = Depends(get_current_active_user),
-    category_id: int,
+    category_id: uuid.UUID,
     category_update: UpdateCategory
 ):
     cmd = select(Category).where(Category.user == user)
