@@ -6,7 +6,7 @@ from sqlmodel import Session, select, func, col
 from fastapi import Depends, HTTPException, status, Query
 from sqlmodel.sql.expression import Select, SelectOfScalar
 
-from database import create_session, engine
+from database import create_session
 from schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User, \
     UpdateTransaction
 from routers.auth import get_current_active_user
@@ -31,40 +31,58 @@ def sort_transactions_statement(statement: Select | SelectOfScalar):
     return statement
 
 
-def get_running_balance(session: Session, transaction: Transaction, user: User):
-    cmd = select(Transaction).where(Transaction.user == user)
-    cmd = cmd.where(Transaction.account_id == transaction.account_id)
-    cmd = cmd.where(Transaction.transaction_date <= transaction.transaction_date)
-    cmd = cmd.where(Transaction.amount > transaction.amount)
-    cmd = sort_transactions_statement(cmd)
-    older_transaction = session.exec(cmd).first()
-    if older_transaction:
-        transaction.running_balance = older_transaction.running_balance + transaction.amount
+def transaction_count_for_account(session: Session, user: User, transaction: Transaction):
+    statement = select(func.count(Transaction.id))
+    statement = statement.where(Transaction.user_id == user.id)
+    statement = statement.where(Transaction.account_id == transaction.account_id)
+    transactions_for_account = session.exec(statement).one()
+    return transactions_for_account
+
+
+def get_previous_transaction(session: Session, user: User, transaction: Transaction):
+    statement = select(Transaction)
+    statement = statement.where(Transaction.user_id == user.id)
+    statement = statement.where(Transaction.account_id == transaction.account_id)
+    statement = statement.where(Transaction.transaction_date <= transaction.transaction_date)
+    statement = statement.where(Transaction.id != transaction.id)
+    statement = statement.order_by(col(Transaction.ordinal).desc())
+    transactions = session.exec(statement).all()
+    if len(transactions) > 0:
+        return transactions[0]
     else:
-        transaction.running_balance = transaction.amount
+        return None
 
 
-def update_running_balance(session: Session, transaction: Transaction, user: User):
-    cmd = select(Transaction).where(Transaction.user == user)
-    cmd = cmd.where(Transaction.account_id == transaction.account_id)
-    cmd = cmd.where(Transaction.transaction_date >= transaction.transaction_date)
-    cmd = cmd.where(Transaction.amount <= transaction.amount)
-    cmd = cmd.where(Transaction.id != transaction.id)
-    cmd = sort_transactions_statement(cmd)
-    newer_transactions = session.exec(cmd)
+def update_future_transactions(session: Session, user: User, transaction: Transaction, previous_ordinal: int | None = None):
+    if previous_ordinal:
+        if transaction.ordinal > previous_ordinal:
+            ordinal = previous_ordinal
+            statement = select(Transaction)
+            statement = statement.where(Transaction.user_id == user.id)
+            statement = statement.where(Transaction.account_id == transaction.account_id)
+            statement = statement.where(Transaction.ordinal < ordinal)
+            statement = statement.order_by(col(Transaction.ordinal).asc())
+            transaction = session.exec(statement).first()
 
-    if newer_transactions:
-        previous_transaction = None
-        for newer_transaction in newer_transactions:
-            if previous_transaction is None:
-                newer_transaction.running_balance = transaction.running_balance + newer_transaction.amount
-                session.add(newer_transaction)
-                previous_transaction = newer_transaction
-                continue
-            newer_transaction.running_balance = previous_transaction.running_balance + newer_transaction.amount
-            session.add(newer_transaction)
-            previous_transaction = newer_transaction
-        session.commit()
+    statement = select(Transaction)
+    statement = statement.where(Transaction.user_id == user.id)
+    statement = statement.where(Transaction.account_id == transaction.account_id)
+    # statement = statement.where(Transaction.transaction_date > transaction.transaction_date)
+    statement = statement.where(Transaction.ordinal > transaction.ordinal)
+    statement = statement.order_by(col(Transaction.ordinal).asc())
+    transactions = session.exec(statement).all()
+
+    previous_transaction = None
+    for future_transaction in transactions:
+        if previous_transaction is None:
+            future_transaction.ordinal = transaction.ordinal + 1
+            future_transaction.running_balance = transaction.running_balance + future_transaction.amount
+        else:
+            future_transaction.ordinal = previous_transaction.ordinal + 1
+            future_transaction.running_balance = previous_transaction.running_balance + future_transaction.amount
+        session.add(future_transaction)
+        previous_transaction = future_transaction
+    session.commit()
 
 
 @transactions_router.post("/", response_model=ReadTransaction)
@@ -76,17 +94,45 @@ def create_transaction(
 ):
     update_fields = {
         "user_id": user.id,
-        "running_balance": 0.00
+        "created_date": datetime.datetime.utcnow(),
+        "updated_date": datetime.datetime.utcnow(),
+        "ordinal": 0,
+        "running_balance": transaction.amount,
     }
     transaction = Transaction.from_orm(transaction, update=update_fields)
+    # are there any transactions for this account?
+    transactions_for_account = transaction_count_for_account(session, user, transaction)
 
-    get_running_balance(session=session, transaction=transaction, user=user)
+    if transactions_for_account == 0:
+        # this is the first transaction for the account
+        # just push it in
+        transaction.ordinal = 1
+        transaction.running_balance = transaction.amount
 
-    session.add(transaction)
-    session.commit()
-    session.refresh(transaction)
+        session.add(transaction)
+        session.commit()
+        session.refresh(transaction)
 
-    update_running_balance(session=session, transaction=transaction, user=user)
+        return transaction
+    # are there any transactions for this day?
+    previous_transaction = get_previous_transaction(session, user, transaction)
+    if previous_transaction:
+        transaction.ordinal = previous_transaction.ordinal + 1,
+        transaction.running_balance = previous_transaction.running_balance + transaction.amount
+
+        session.add(transaction)
+        session.commit()
+        session.refresh(transaction)
+    else:
+        transaction.ordinal = 1
+        transaction.running_balance = transaction.amount
+
+        session.add(transaction)
+        session.commit()
+        session.refresh(transaction)
+
+    # future days?
+    update_future_transactions(session, user, transaction)
 
     return transaction
 
@@ -119,17 +165,29 @@ def update_transaction(
     transaction = session.exec(cmd).first()
     if not transaction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    previous_ordinal = transaction.ordinal
     update_dict = transaction_update.dict(exclude_unset=True)
     for key, value in update_dict.items():
         setattr(transaction, key, value)
     if "transaction_date" in update_dict.keys() or "amount" in update_dict.keys():
-        get_running_balance(session=session, transaction=transaction, user=user)
+        previous_transaction = get_previous_transaction(session, user, transaction)
+        if previous_transaction:
+            transaction.ordinal = previous_transaction.ordinal + 1,
+            transaction.running_balance = previous_transaction.running_balance + transaction.amount
 
-        session.add(transaction)
-        session.commit()
-        session.refresh(transaction)
+            session.add(transaction)
+            session.commit()
+            session.refresh(transaction)
+        else:
+            transaction.ordinal = 1
+            transaction.running_balance = transaction.amount
 
-        update_running_balance(session=session, transaction=transaction, user=user)
+            session.add(transaction)
+            session.commit()
+            session.refresh(transaction)
+
+        # future days?
+        update_future_transactions(session, user, transaction, previous_ordinal)
     else:
         session.add(transaction)
         session.commit()
@@ -190,7 +248,7 @@ def get_transactions_for_account(
 ):
     cmd = select(Transaction).where(Transaction.user_id == user.id)
     cmd = cmd.where(Transaction.account_id == account_id)
-    cmd = sort_transactions_statement(cmd)
+    cmd = cmd.order_by(col(Transaction.ordinal).desc())
     cmd = cmd.offset(offset)
     cmd = cmd.limit(limit)
     transactions = session.exec(cmd).all()

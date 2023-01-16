@@ -79,10 +79,10 @@ class UpdateCategory(SQLModel):
 class BaseTransaction(SQLModel):
     memo: str
     amount: float
-    transaction_date: datetime.date
+    transaction_date: datetime.date = Field(index=True)
     transaction_type: TransactionType
     description: str | None
-    transaction_id: uuid.UUID | None
+    transaction_token: str | None
 
 
 class Transaction(BaseTransaction, table=True):
@@ -92,8 +92,12 @@ class Transaction(BaseTransaction, table=True):
         index=True,
         nullable=False
     )
+    created_date: datetime.datetime
+    updated_date: datetime.datetime
+    transaction_date: datetime.date
     active: bool = Field(default=True)
     running_balance: float
+    ordinal: int
 
     account_id: uuid.UUID = Field(foreign_key="account.id")
     category_id: uuid.UUID = Field(foreign_key="category.id")
@@ -112,7 +116,6 @@ class UpdateTransaction(SQLModel):
     transaction_date: datetime.datetime | None
     transaction_type: TransactionType | None
     description: str | None
-    transaction_id: uuid.UUID | None
     category_id: uuid.UUID | None
     bill_id: uuid.UUID | None
 
