@@ -8,7 +8,7 @@ app = FastAPI(title="Duck Ledger")
 
 origins = [
     "http://localhost",
-    "http://localhost:8080",
+    "http://localhost:61577",
 ]
 
 app.add_middleware(
