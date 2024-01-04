@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime
 import secrets
-import emailduck
+from api import emailduck
 from fastapi import Depends, HTTPException, status
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -8,9 +8,9 @@ from fastapi.routing import APIRouter
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from schemas import User, RefreshToken
+from api.schemas import User, RefreshToken
 from sqlmodel import Session, select
-from database import create_session
+from api.database import create_session
 
 
 class Token(BaseModel):
@@ -39,7 +39,7 @@ class RegisterResponse(BaseModel):
 class RegisterUser(BaseModel):
     username: str = Field(min_length=6, max_length=20)
     email: str = Field(regex=r"^\S+@\S+\.\S+$")
-    password: str = Field(min_length=8, regex=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$")
+    password: str = Field(min_length=8, regex=r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$")
 
     class Config:
         schema_extra = {

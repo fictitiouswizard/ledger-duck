@@ -3,9 +3,9 @@ import uuid
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select, col
 from fastapi import Depends, status, HTTPException, Query
-from schemas import Bill, User, ReadBill, CreateBill, UpdateBill
-from database import create_session
-from routers.auth import get_current_active_user
+from api.schemas import Bill, User, ReadBill, CreateBill, UpdateBill
+from api.database import create_session
+from api.routers.auth import get_current_active_user
 
 
 router = APIRouter(prefix="/bills", tags=["bills"])

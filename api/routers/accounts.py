@@ -1,9 +1,9 @@
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select
 from fastapi import Depends, status, HTTPException, Query
-from schemas import Account, ReadAccount, CreateAccount, UpdateAccount, User
-from database import create_session
-from routers.auth import get_current_active_user
+from api.schemas import Account, ReadAccount, CreateAccount, UpdateAccount, User
+from api.database import create_session
+from api.routers.auth import get_current_active_user
 import uuid
 
 
