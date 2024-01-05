@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Jason Sanders <fictitiouswizard@gmail.com>"]
 readme = "README.md"
-packages = [{include = "ledger_duck"}]
+packages = [{include = "api"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
