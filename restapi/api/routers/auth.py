@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime
 import secrets
-from api import emailduck
+from restapi.api import emailduck
 from fastapi import Depends, HTTPException, status
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -8,9 +8,9 @@ from fastapi.routing import APIRouter
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from api.schemas import User, RefreshToken
+from restapi.api.schemas import User, RefreshToken
 from sqlmodel import Session, select
-from api.database import create_session
+from restapi.api.database import create_session
 
 
 class Token(BaseModel):

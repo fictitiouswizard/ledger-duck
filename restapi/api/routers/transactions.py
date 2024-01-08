@@ -6,10 +6,10 @@ from sqlmodel import Session, select, func, col
 from fastapi import Depends, HTTPException, status, Query
 from sqlmodel.sql.expression import Select, SelectOfScalar
 
-from api.database import create_session
-from api.schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User, \
+from restapi.api.database import create_session
+from restapi.api.schemas import Transaction, CreateTransaction, ReadTransaction, CreateAccountTransaction, Account, User, \
     UpdateTransaction
-from api.routers.auth import get_current_active_user
+from restapi.api.routers.auth import get_current_active_user
 
 accounts_router = APIRouter(
     prefix="/accounts/{account_id}/transactions",

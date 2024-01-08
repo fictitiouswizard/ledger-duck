@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import accounts, categories, transactions, auth, bills
+from restapi.api.routers import accounts, categories, transactions, auth, bills
 
-from api.database import create_db_and_tables
+from restapi.api.database import create_db_and_tables
 
 app = FastAPI(title="Duck Ledger")
 

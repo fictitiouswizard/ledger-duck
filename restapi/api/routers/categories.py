@@ -2,11 +2,11 @@ import uuid
 
 from fastapi.routing import APIRouter
 from sqlmodel import Session, select, col
-from api.database import create_session
+from restapi.api.database import create_session
 from fastapi import Depends, HTTPException, status, Query
 
-from api.schemas import Category, CreateCategory, ReadCategory, User, UpdateCategory
-from api.routers.auth import get_current_active_user
+from restapi.api.schemas import Category, CreateCategory, ReadCategory, User, UpdateCategory
+from restapi.api.routers.auth import get_current_active_user
 
 
 router = APIRouter(prefix="/categories", tags=["categories"])
